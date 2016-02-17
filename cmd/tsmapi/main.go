@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/espang/tsmapi/Godeps/_workspace/src/github.com/garyburd/redigo/redis"
@@ -16,7 +16,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, "This is the response on a request")
 }
 
-func newPool(addr string, database int) *redis.Pool {
+func newPool(addr, password string, database int) *redis.Pool {
 	return &redis.Pool{
 		MaxIdle:     3,
 		MaxActive:   20,
@@ -24,6 +24,10 @@ func newPool(addr string, database int) *redis.Pool {
 		Dial: func() (redis.Conn, error) {
 			c, err := redis.Dial("tcp", addr)
 			if err != nil {
+				return nil, err
+			}
+			if _, err := c.Do("AUTH", password); err != nil {
+				c.Close()
 				return nil, err
 			}
 			if _, err := c.Do("Select", database); err != nil {
@@ -39,15 +43,25 @@ func newPool(addr string, database int) *redis.Pool {
 	}
 }
 
-func getRedisUrlAndDatabase() (string, int) {
+func getRedisUrlAndDatabase() (string, string, bool, int) {
 	//redis://h:p9g8j7vtmb66traulde6i4ngvtu@ec2-107-22-209-183.compute-1.amazonaws.com:6889
 	redis_url := os.Getenv("REDIS_URL")
 	if redis_url == "" {
 		log.Fatal("$REDIS_URL must be set")
 	}
 
-	//remove prefix 'redis://'
-	redis_url = strings.Replace(redis_url, "redis://", "", 1)
+	u, err := url.Parse(redis_url)
+	if err != nil {
+		log.Fatalf("Error parsing url: %v", err)
+	}
+	fmt.Printf("u: %#v\n", u)
+	time.Sleep(time.Second)
+	redis_host := u.Host
+	redis_pw := ""
+	ok := false
+	if u.User != nil {
+		redis_pw, ok = u.User.Password()
+	}
 
 	redis_db := os.Getenv("REDIS_DB")
 	if redis_db == "" {
@@ -59,7 +73,7 @@ func getRedisUrlAndDatabase() (string, int) {
 		log.Fatalf("$REDIS_DB should be an integer, is '%s', %v", redis_db, database)
 	}
 
-	return redis_url, database
+	return redis_host, redis_pw, ok, database
 }
 
 func main() {
@@ -69,10 +83,10 @@ func main() {
 		log.Fatal("$PORT must be set")
 	}
 
-	redis_url, redis_db := getRedisUrlAndDatabase()
-	fmt.Println("redis: ", redis_url, redis_db)
+	redis_host, redis_pw, pw_set, redis_db := getRedisUrlAndDatabase()
+	fmt.Printf("Host: %s, password: %s, pw_set: %s, db: %d", redis_host, redis_pw, pw_set, redis_db)
 
-	pool := newPool(redis_url, redis_db)
+	pool := newPool(redis_host, redis_pw, redis_db)
 	conn := pool.Get()
 	defer conn.Close()
 
