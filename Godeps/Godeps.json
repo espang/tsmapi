@@ -1,0 +1,8 @@
+{
+	"ImportPath": "github.com/espang/tsmapi",
+	"GoVersion": "go1.5",
+	"Packages": [
+		"./..."
+	],
+	"Deps": []
+}
