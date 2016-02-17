@@ -54,7 +54,12 @@ func getRedisUrlAndDatabase() (string, int) {
 		log.Fatal("$REDIS_DB must be set")
 	}
 
-	return redis_url, redis_db
+	database, err := strconv.Atoi(redis_db)
+	if err != nil {
+		log.Fatalf("$REDIS_DB should be an integer, is '%s', %v", redis_db, database)
+	}
+
+	return redis_url, database
 }
 
 func main() {
@@ -67,16 +72,11 @@ func main() {
 	redis_url, redis_db := getRedisUrlAndDatabase()
 	fmt.Println("redis: ", redis_url, redis_db)
 
-	database, err := strconv.Atoi(redis_db)
-	if err != nil {
-		log.Fatalf("$REDIS_DB should be an integer, is '%s', %v", redis_db, database)
-	}
-
-	pool := newPool(redis_url, database)
+	pool := newPool(redis_url, redis_db)
 	conn := pool.Get()
 	defer conn.Close()
 
-	_, err = conn.Do("SET", "k", "v")
+	_, err := conn.Do("SET", "k", "v")
 	if err != nil {
 		log.Fatalf("SET does not work: %v", err)
 	}
