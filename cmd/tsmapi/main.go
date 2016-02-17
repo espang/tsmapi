@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/espang/tsmapi/Godeps/_workspace/src/github.com/garyburd/redigo/redis"
@@ -38,6 +39,24 @@ func newPool(addr string, database int) *redis.Pool {
 	}
 }
 
+func getRedisUrlAndDatabase() (string, int) {
+	//redis://h:p9g8j7vtmb66traulde6i4ngvtu@ec2-107-22-209-183.compute-1.amazonaws.com:6889
+	redis_url := os.Getenv("REDIS_URL")
+	if redis_url == "" {
+		log.Fatal("$REDIS_URL must be set")
+	}
+
+	//remove prefix 'redis://'
+	redis_url = strings.Replace(redis_url, "redis://", "", 1)
+
+	redis_db := os.Getenv("REDIS_DB")
+	if redis_db == "" {
+		log.Fatal("$REDIS_DB must be set")
+	}
+
+	return redis_url, redis_db
+}
+
 func main() {
 	port := os.Getenv("PORT")
 
@@ -45,17 +64,7 @@ func main() {
 		log.Fatal("$PORT must be set")
 	}
 
-	redis_url := os.Getenv("REDIS_URL")
-
-	if redis_url == "" {
-		log.Fatal("$REDIS_URL must be set")
-	}
-
-	redis_db := os.Getenv("REDIS_DB")
-	if redis_db == "" {
-		log.Fatal("$REDIS_DB must be set")
-	}
-
+	redis_url, redis_db := getRedisUrlAndDatabase()
 	fmt.Println("redis: ", redis_url, redis_db)
 
 	database, err := strconv.Atoi(redis_db)
