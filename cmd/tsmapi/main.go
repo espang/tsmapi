@@ -67,7 +67,7 @@ func main() {
 	conn := pool.Get()
 	defer conn.Close()
 
-	_, err := conn.Do("SET", "k", "v")
+	_, err = conn.Do("SET", "k", "v")
 	if err != nil {
 		log.Fatalf("SET does not work: %v", err)
 	}
