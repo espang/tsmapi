@@ -1,12 +1,8 @@
-# cache
+# tsmapi
 
-Cache 
-Some implementations for caching responses to requests of a webserver.
+simple heroku app for reading and writing time series & data
 
-## map
+## motivation
 
-Map of string keys to byte slice keys. Cache will not expire by time.
+play with heroku and test some heroku elements like heroku-redis
 
-## redis
-
-Redis caching as redis strings. The expire time can be configured.
