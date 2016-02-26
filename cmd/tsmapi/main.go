@@ -9,6 +9,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/espang/tsmapi"
+
+	"github.com/espang/tsmapi/Godeps/_workspace/src/github.com/espang/router"
 	"github.com/espang/tsmapi/Godeps/_workspace/src/github.com/garyburd/redigo/redis"
 )
 
@@ -16,7 +19,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, "This is the response on a request")
 }
 
-func newPool(addr, password string, database int) *redis.Pool {
+func newPool(addr, password string, usePw bool, database int) *redis.Pool {
 	return &redis.Pool{
 		MaxIdle:     3,
 		MaxActive:   20,
@@ -26,9 +29,11 @@ func newPool(addr, password string, database int) *redis.Pool {
 			if err != nil {
 				return nil, err
 			}
-			if _, err := c.Do("AUTH", password); err != nil {
-				c.Close()
-				return nil, err
+			if usePw {
+				if _, err := c.Do("AUTH", password); err != nil {
+					c.Close()
+					return nil, err
+				}
 			}
 			if _, err := c.Do("Select", database); err != nil {
 				c.Close()
@@ -56,24 +61,24 @@ func getRedisUrlAndDatabase() (string, string, bool, int) {
 	}
 	fmt.Printf("u: %#v\n", u)
 	time.Sleep(time.Second)
-	redis_host := u.Host
-	redis_pw := ""
+	redisHost := u.Host
+	redisPw := ""
 	ok := false
 	if u.User != nil {
-		redis_pw, ok = u.User.Password()
+		redisPw, ok = u.User.Password()
 	}
 
-	redis_db := os.Getenv("REDIS_DB")
-	if redis_db == "" {
+	redisDb := os.Getenv("REDIS_DB")
+	if redisDb == "" {
 		log.Fatal("$REDIS_DB must be set")
 	}
 
-	database, err := strconv.Atoi(redis_db)
+	database, err := strconv.Atoi(redisDb)
 	if err != nil {
-		log.Fatalf("$REDIS_DB should be an integer, is '%s', %v", redis_db, database)
+		log.Fatalf("$REDIS_DB should be an integer, is '%s', %v", redisDb, database)
 	}
 
-	return redis_host, redis_pw, ok, database
+	return redisHost, redisPw, ok, database
 }
 
 func main() {
@@ -83,10 +88,10 @@ func main() {
 		log.Fatal("$PORT must be set")
 	}
 
-	redis_host, redis_pw, pw_set, redis_db := getRedisUrlAndDatabase()
-	fmt.Printf("Host: %s, password: %s, pw_set: %s, db: %d", redis_host, redis_pw, pw_set, redis_db)
+	redisHost, redisPw, pwSet, redisDb := getRedisUrlAndDatabase()
+	fmt.Printf("Host: %s, password: %s, pw_set: %s, db: %d", redisHost, redisPw, pwSet, redisDb)
 
-	pool := newPool(redis_host, redis_pw, redis_db)
+	pool := newPool(redisHost, redisPw, pwSet, redisDb)
 	conn := pool.Get()
 	defer conn.Close()
 
@@ -101,7 +106,20 @@ func main() {
 	}
 	fmt.Println("Value: ", res)
 
+	routes := tsmapi.Initialize()
+
+	cache, err := router.NewMapCache(2)
+	if err != nil {
+		log.Fatalf("Could not get Cache: %v", cache)
+	}
+
+	router := router.NewRouter(
+		routes,
+		router.Logging(),
+		router.LoggedCaching(cache),
+	)
+
 	addr := fmt.Sprintf(":%s", port)
-	http.HandleFunc("/", handler)
-	log.Fatal(http.ListenAndServe(addr, nil))
+	log.Printf("Connect to: '%v'\n", addr)
+	log.Fatal(http.ListenAndServe(addr, router))
 }

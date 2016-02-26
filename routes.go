@@ -1,6 +1,6 @@
-package api
+package tsmapi
 
-import "github.com/espang/router"
+import "github.com/espang/tsmapi/Godeps/_workspace/src/github.com/espang/router"
 
 var routes router.Routes
 
@@ -32,4 +32,8 @@ func init() {
 			WriteTimeseries,
 		},
 	}
+}
+
+func Initialize() router.Routes {
+	return routes
 }
